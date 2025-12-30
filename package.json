@@ -1,0 +1,21 @@
+{
+  "name": "jobfusion-scraper-server",
+  "version": "1.0.0",
+  "description": "Serveur de scraping pour JobFusion",
+  "main": "jobsScraper.js",
+  "scripts": {
+    "start": "node jobsScraper.js",
+    "dev": "nodemon jobsScraper.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^24.0.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": ["scraping", "indeed", "jobs"],
+  "author": "",
+  "license": "ISC"
+}

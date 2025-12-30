@@ -23,14 +23,14 @@ app.use(express.json());
  */
 async function scrapeHelloWorkJobs(query, location = '', maxPages = 3) {
   console.log(`🔍 Recherche HelloWork: "${query}" à "${location}"`);
-  
+
   const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
 
   const page = await browser.newPage();
-  
+
   // Anti-détection
   await page.setUserAgent(
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -43,13 +43,13 @@ async function scrapeHelloWorkJobs(query, location = '', maxPages = 3) {
     for (let pageNum = 0; pageNum < maxPages; pageNum++) {
       const start = pageNum * 15; // HelloWork affiche 15 offres par page
       const url = `https://www.hellowork.com/fr-fr/emplois/search?query=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&offset=${start}`;
-      
+
       console.log(`📄 Page ${pageNum + 1}/${maxPages}: ${url}`);
-      
+
       try {
-        await page.goto(url, { 
+        await page.goto(url, {
           waitUntil: 'networkidle2',
-          timeout: 30000 
+          timeout: 30000
         });
 
         // Attendre le chargement des résultats
@@ -71,30 +71,30 @@ async function scrapeHelloWorkJobs(query, location = '', maxPages = 3) {
               const titleEl = card.querySelector(
                 'h2, h3, [data-testid*="title"], .job-title, a[href*="/emplois/"]'
               );
-              
+
               // Essayer plusieurs sélecteurs pour l'entreprise
               const companyEl = card.querySelector(
                 '[data-testid*="company"], .company-name, .company, span[class*="company"]'
               );
-              
+
               // Localisation
               const locationEl = card.querySelector(
                 '[data-testid*="location"], .location, .job-location, span[class*="location"]'
               );
-              
+
               // Salaire
               const salaryEl = card.querySelector(
                 '.salary, [class*="salary"], span[class*="salary"]'
               );
-              
+
               // Lien vers l'offre
               const linkEl = card.querySelector('a[href*="/emplois/"]');
-              
+
               // Description/Snippet
               const descEl = card.querySelector(
                 '.description, .job-snippet, [class*="snippet"], p'
               );
-              
+
               // Type de contrat
               const typeEl = card.querySelector(
                 '[data-testid*="contract"], .contract-type, span[class*="type"]'
@@ -149,9 +149,9 @@ async function scrapeHelloWorkJobs(query, location = '', maxPages = 3) {
 app.get('/api/jobs/hellowork', async (req, res) => {
   try {
     const { query = 'emploi', location = 'France', maxPages = 2 } = req.query;
-    
+
     const jobs = await scrapeHelloWorkJobs(query, location, parseInt(maxPages));
-    
+
     res.json({
       success: true,
       count: jobs.length,

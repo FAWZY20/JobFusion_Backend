@@ -23,14 +23,14 @@ app.use(express.json());
  */
 async function scrapeIndeedJobs(query, location = '', maxPages = 3) {
   console.log(`🔍 Recherche: "${query}" à "${location}"`);
-  
+
   const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
 
   const page = await browser.newPage();
-  
+
   // Anti-détection
   await page.setUserAgent(
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -43,12 +43,12 @@ async function scrapeIndeedJobs(query, location = '', maxPages = 3) {
     for (let pageNum = 0; pageNum < maxPages; pageNum++) {
       const start = pageNum * 10;
       const url = `https://fr.indeed.com/jobs?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&start=${start}`;
-      
+
       console.log(`📄 Page ${pageNum + 1}/${maxPages}: ${url}`);
-      
-      await page.goto(url, { 
+
+      await page.goto(url, {
         waitUntil: 'networkidle2',
-        timeout: 30000 
+        timeout: 30000
       });
 
       // Attendre le chargement des résultats
@@ -117,9 +117,9 @@ async function scrapeIndeedJobs(query, location = '', maxPages = 3) {
 app.get('/api/jobs/indeed', async (req, res) => {
   try {
     const { query = 'développeur', location = 'Paris', maxPages = 2 } = req.query;
-    
+
     const jobs = await scrapeIndeedJobs(query, location, parseInt(maxPages));
-    
+
     res.json({
       success: true,
       count: jobs.length,

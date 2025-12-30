@@ -41,9 +41,30 @@ async function launchBrowser() {
     ]
   };
 
-  // Sur Render, utiliser Chrome au lieu de Chromium
+  // Sur Render avec Docker, chercher Chromium aux chemins courants
   if (isProduction) {
-    launchOptions.executablePath = process.env.CHROME_PATH || '/usr/bin/chromium-browser';
+    const chromiumPaths = [
+      '/usr/bin/chromium',           // Alpine/Debian avec chromium
+      '/usr/bin/chromium-browser',   // Autres distributions
+      '/opt/google/chrome/chrome'    // Google Chrome
+    ];
+
+    // Chercher le premier chemin qui existe
+    for (const path of chromiumPaths) {
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(path)) {
+          launchOptions.executablePath = path;
+          break;
+        }
+      } catch (e) {}
+    }
+
+    // Fallback : laisser Puppeteer gérer (télécharge Chromium si nécessaire)
+    if (!launchOptions.executablePath) {
+      launchOptions.executablePath = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+
     launchOptions.args.push('--single-process'); // Économise la mémoire sur Render
   }
 

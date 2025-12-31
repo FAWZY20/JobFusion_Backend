@@ -85,6 +85,17 @@ async function scrapeIndeedJobs(query, location = '', maxPages = 3) {
 
   const page = await browser.newPage();
   
+  // Bloquer les ressources inutiles pour accélérer
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    const resourceType = request.resourceType();
+    if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+      request.abort();
+    } else {
+      request.continue();
+    }
+  });
+  
   await page.setUserAgent(
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
   );
@@ -99,63 +110,72 @@ async function scrapeIndeedJobs(query, location = '', maxPages = 3) {
       
       console.log(`  📄 Page ${pageNum + 1}/${maxPages}`);
       
-      await page.goto(url, { 
-        waitUntil: 'networkidle2',
-        timeout: 30000 
-      });
-
-      await page.waitForSelector('.job_seen_beacon, .jobsearch-ResultsList', { timeout: 10000 }).catch(() => {});
-
-      const jobs = await page.evaluate(() => {
-        const jobCards = document.querySelectorAll('.job_seen_beacon');
-        const results = [];
-
-        jobCards.forEach(card => {
-          try {
-            const titleEl = card.querySelector('h2.jobTitle span[title], h2.jobTitle a span');
-            const companyEl = card.querySelector('[data-testid="company-name"], .companyName');
-            const locationEl = card.querySelector('[data-testid="text-location"], .companyLocation');
-            const salaryEl = card.querySelector('.salary-snippet, .metadata.salary-snippet-container');
-            const linkEl = card.querySelector('a.jcs-JobTitle, h2.jobTitle a');
-            const descEl = card.querySelector('.job-snippet, .jobCardShelfContainer');
-            
-            // Générer une date aléatoire
-            const randomDays = Math.floor(Math.random() * 8); // 0 à 7 jours
-            let postedDate;
-            if (randomDays === 0) {
-              postedDate = "Aujourd'hui";
-            } else if (randomDays === 1) {
-              postedDate = "Il y a 1 jour";
-            } else {
-              postedDate = `Il y a ${randomDays} jours`;
-            }
-
-            if (titleEl && companyEl) {
-              results.push({
-                title: titleEl.textContent.trim(),
-                company: companyEl.textContent.trim(),
-                location: locationEl ? locationEl.textContent.trim() : 'Non spécifié',
-                salary: salaryEl ? salaryEl.textContent.trim() : null,
-                description: descEl ? descEl.textContent.trim().substring(0, 200) + '...' : '',
-                url: linkEl ? 'https://fr.indeed.com' + linkEl.getAttribute('href') : '',
-                posted: postedDate,
-                type: 'CDI',
-                source: 'Indeed'
-              });
-            }
-          } catch (err) {
-            console.error('  ⚠️ Erreur parsing job card');
-          }
+      try {
+        await page.goto(url, { 
+          waitUntil: 'domcontentloaded',
+          timeout: 45000 
         });
 
-        return results;
-      });
+        // Attendre un peu pour le rendu
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
-      console.log(`    ✅ ${jobs.length} offres trouvées`);
-      allJobs.push(...jobs);
+        await page.waitForSelector('.job_seen_beacon, .jobsearch-ResultsList', { timeout: 10000 }).catch(() => {
+          console.log('  ⚠️ Sélecteur non trouvé');
+        });
 
-      if (pageNum < maxPages - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
+        const jobs = await page.evaluate(() => {
+          const jobCards = document.querySelectorAll('.job_seen_beacon');
+          const results = [];
+
+          jobCards.forEach(card => {
+            try {
+              const titleEl = card.querySelector('h2.jobTitle span[title], h2.jobTitle a span');
+              const companyEl = card.querySelector('[data-testid="company-name"], .companyName');
+              const locationEl = card.querySelector('[data-testid="text-location"], .companyLocation');
+              const salaryEl = card.querySelector('.salary-snippet, .metadata.salary-snippet-container');
+              const linkEl = card.querySelector('a.jcs-JobTitle, h2.jobTitle a');
+              const descEl = card.querySelector('.job-snippet, .jobCardShelfContainer');
+              
+              const randomDays = Math.floor(Math.random() * 8);
+              let postedDate;
+              if (randomDays === 0) {
+                postedDate = "Aujourd'hui";
+              } else if (randomDays === 1) {
+                postedDate = "Il y a 1 jour";
+              } else {
+                postedDate = `Il y a ${randomDays} jours`;
+              }
+
+              if (titleEl && companyEl) {
+                results.push({
+                  title: titleEl.textContent.trim(),
+                  company: companyEl.textContent.trim(),
+                  location: locationEl ? locationEl.textContent.trim() : 'Non spécifié',
+                  salary: salaryEl ? salaryEl.textContent.trim() : null,
+                  description: descEl ? descEl.textContent.trim().substring(0, 200) + '...' : '',
+                  url: linkEl ? 'https://fr.indeed.com' + linkEl.getAttribute('href') : '',
+                  posted: postedDate,
+                  type: 'CDI',
+                  source: 'Indeed'
+                });
+              }
+            } catch (err) {
+              console.error('  ⚠️ Erreur parsing job card');
+            }
+          });
+
+          return results;
+        });
+
+        console.log(`    ✅ ${jobs.length} offres trouvées`);
+        allJobs.push(...jobs);
+
+        if (pageNum < maxPages - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
+        }
+      } catch (pageError) {
+        console.error(`  ⚠️ Erreur page ${pageNum + 1}:`, pageError.message);
+        continue;
       }
     }
   } catch (error) {
